@@ -1,7 +1,23 @@
 const CACHE_NAME = 'tashfir-v1';
 
+// Pre-cache essential files
+const ASSETS_TO_CACHE = [
+  './',
+  './index.html',
+  './manifest.json'
+];
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      // Try to cache core assets. We use catch to prevent install failure 
+      // if one file is missing in specific dev environments.
+      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
+        console.warn('Pre-caching failed:', err);
+      });
+    })
+  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -24,24 +40,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation requests (HTML) - Network First, fallback to cache
+  // Navigation requests (HTML) - Network First, fallback to Cache, then fallback to index.html
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // If online, cache the latest version
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-             cache.put(event.request, responseToCache).catch(err => {
-               // Ignore QuotaExceededError or other cache errors to keep app running
-               console.warn('SW Cache Error (Navigate):', err);
-             });
-          });
+          // If valid response, clone and cache it
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+               cache.put(event.request, responseToCache).catch(() => {});
+            });
+          }
           return response;
         })
         .catch(() => {
-          // If offline, try cache
-          return caches.match(event.request);
+          // Network failed, try to get the specific page from cache
+          return caches.match(event.request).then(response => {
+             if (response) return response;
+             
+             // If specific page not found, fallback to index.html (SPA support)
+             // Try variations of the root path
+             return caches.match('./index.html')
+                .then(r => r || caches.match('./'))
+                .then(r => r || caches.match('index.html'));
+          });
         })
     );
     return;
@@ -55,10 +78,7 @@ self.addEventListener('fetch', (event) => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache).catch(err => {
-               // Ignore QuotaExceededError
-               console.warn('SW Cache Error (Asset):', err);
-            });
+            cache.put(event.request, responseToCache).catch(() => {});
           });
         }
         return networkResponse;
