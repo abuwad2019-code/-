@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Unlock, ShieldCheck, Download, AlertCircle, Image as ImageIcon, FileText, Wand2, Key, Eye, EyeOff, Smartphone, Trash2, Facebook, MessageCircle, Moon, Sun, Clock } from 'lucide-react';
+import { Lock, Unlock, ShieldCheck, Download, AlertCircle, Image as ImageIcon, FileText, Wand2, Key, Eye, EyeOff, Smartphone, Trash2, Facebook, MessageCircle, Moon, Sun, Clock, Eraser, AlertTriangle, Loader2, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import JSZip from 'jszip';
 import { FileUploader } from './components/FileUploader';
@@ -11,17 +11,12 @@ function App() {
   // Theme State with Time Awareness
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
-      // 1. Check if user has manually set a preference previously
       const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
       if (savedTheme) {
         return savedTheme;
       }
-
-      // 2. If no preference, check the time (Auto-Theme)
-      // Night mode is active from 6 PM (18:00) to 6 AM (06:00)
       const hour = new Date().getHours();
       const isNight = hour >= 18 || hour < 6;
-      
       if (isNight) {
         return 'dark';
       }
@@ -35,8 +30,13 @@ function App() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
+  // Auto Clear State
+  const [autoClear, setAutoClear] = useState(false);
+  const [showDeleteReminder, setShowDeleteReminder] = useState(false);
+  
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   // Encrypt State
   const [coverImage, setCoverImage] = useState<File | null>(null);
@@ -48,6 +48,9 @@ function App() {
   const [encodedImage, setEncodedImage] = useState<File | null>(null);
   const [decryptedFiles, setDecryptedFiles] = useState<JSZip | null>(null);
   const [extractedFileList, setExtractedFileList] = useState<string[]>([]);
+  
+  // File Download Status State: { [filename]: 'idle' | 'loading' | 'success' }
+  const [fileDownloadStatus, setFileDownloadStatus] = useState<Record<string, 'idle' | 'loading' | 'success'>>({});
 
   // Theme Effect
   useEffect(() => {
@@ -64,19 +67,28 @@ function App() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  // Cleanup Blob URLs to prevent memory leaks (Quota Exceeded)
+  // Check if app is already installed
   useEffect(() => {
-    return () => {
-      if (resultImage) {
-        URL.revokeObjectURL(resultImage);
-      }
+    const checkStandalone = () => {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                           (window.navigator as any).standalone === true;
+      setIsInstalled(isStandalone);
     };
-  }, [resultImage]);
+    
+    checkStandalone();
+    window.addEventListener('resize', checkStandalone); // Sometimes mode changes on resize
+    
+    return () => window.removeEventListener('resize', checkStandalone);
+  }, []);
 
+  // Handle Install Prompt
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      // Only set prompt if not already installed (extra safety)
+      if (!isInstalled) {
+        setDeferredPrompt(e);
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -84,13 +96,15 @@ function App() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
-  }, []);
+  }, [isInstalled]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
   };
 
   const handleModeChange = (newMode: AppMode) => {
@@ -98,17 +112,26 @@ function App() {
     setError(null);
     setLoading(false);
     setPassword('');
-    // Reset states
     setCoverImage(null);
     setSecretFiles([]);
-    // Revoke old URL before clearing
     if (resultImage) URL.revokeObjectURL(resultImage);
     setResultImage(null);
     setEncodedImage(null);
     setDecryptedFiles(null);
     setExtractedFileList([]);
     setResizeInfo(null);
+    setShowDeleteReminder(false);
+    setFileDownloadStatus({});
   };
+
+  // Cleanup Blob URLs
+  useEffect(() => {
+    return () => {
+      if (resultImage) {
+        URL.revokeObjectURL(resultImage);
+      }
+    };
+  }, [resultImage]);
 
   const onEncrypt = async () => {
     if (!coverImage || secretFiles.length === 0) return;
@@ -120,17 +143,15 @@ function App() {
     setLoading(true);
     setError(null);
     setResizeInfo(null);
+    setShowDeleteReminder(false);
     
-    // Clean previous result
     if (resultImage) {
         URL.revokeObjectURL(resultImage);
         setResultImage(null);
     }
 
     try {
-      // Small delay to let UI render loading state
       await new Promise(r => setTimeout(r, 100));
-      
       const { blob, isResized, originalDimensions, newDimensions } = await hideFiles(coverImage, secretFiles, password);
       const url = URL.createObjectURL(blob);
       setResultImage(url);
@@ -138,6 +159,14 @@ function App() {
       if (isResized) {
         setResizeInfo({ original: originalDimensions, new: newDimensions });
       }
+
+      // Auto Clear Logic
+      if (autoClear) {
+        setSecretFiles([]); // Clear Secret Files from memory
+        setCoverImage(null); // Clear Cover Image from memory
+        setShowDeleteReminder(true); // Trigger UI reminder
+      }
+
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'حدث خطأ أثناء عملية التشفير.');
@@ -157,10 +186,10 @@ function App() {
     setError(null);
     setExtractedFileList([]);
     setDecryptedFiles(null);
+    setFileDownloadStatus({});
 
     try {
        await new Promise(r => setTimeout(r, 100));
-       
        const zip = await extractFiles(encodedImage, password);
        const files: string[] = [];
        zip.forEach((relativePath) => files.push(relativePath));
@@ -189,15 +218,35 @@ function App() {
 
   const downloadExtractedFile = async (filename: string) => {
     if (!decryptedFiles) return;
-    const file = decryptedFiles.file(filename);
-    if (file) {
-      const blob = await file.async('blob');
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000); // Revoke after download
+    
+    // Set status to loading
+    setFileDownloadStatus(prev => ({ ...prev, [filename]: 'loading' }));
+
+    try {
+      const file = decryptedFiles.file(filename);
+      if (file) {
+        // Add a small delay for better UX perception
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const blob = await file.async('blob');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        // Set status to success
+        setFileDownloadStatus(prev => ({ ...prev, [filename]: 'success' }));
+
+        // Optional: Revert to idle after 3 seconds
+        setTimeout(() => {
+             setFileDownloadStatus(prev => ({ ...prev, [filename]: 'idle' }));
+        }, 3000);
+      }
+    } catch (e) {
+      console.error("Download error", e);
+      setFileDownloadStatus(prev => ({ ...prev, [filename]: 'idle' }));
     }
   };
 
@@ -225,11 +274,10 @@ function App() {
               title={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'}
             >
               {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-              
-              {/* Optional: Indicator if set by time? No, keep it simple. */}
             </button>
 
-            {deferredPrompt && (
+            {/* Show Install Button ONLY if deferredPrompt is available AND not already installed */}
+            {deferredPrompt && !isInstalled && (
               <button
                 onClick={handleInstallClick}
                 className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 dark:bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-700 dark:hover:bg-slate-600 transition-all shadow-md active:scale-95 animate-in fade-in slide-in-from-top-2"
@@ -319,13 +367,13 @@ function App() {
               </div>
             </div>
 
-            {/* Password Field */}
+            {/* Password Field & Auto Clear Toggle */}
             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 max-w-xl mx-auto transition-colors">
                <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-slate-200">
                   <span className="bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 p-2 rounded-lg"><Key size={18}/></span>
                   3. كلمة المرور (مطلوب)
                 </h2>
-                <div className="relative">
+                <div className="relative mb-4">
                   <input 
                     type={showPassword ? "text" : "password"}
                     value={password}
@@ -340,7 +388,24 @@ function App() {
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">
+
+                {/* Auto Clear Toggle */}
+                <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-100 dark:border-slate-800 cursor-pointer" onClick={() => setAutoClear(!autoClear)}>
+                   <div className={clsx("w-10 h-6 rounded-full p-1 transition-colors duration-300 relative", autoClear ? "bg-red-500" : "bg-slate-300 dark:bg-slate-600")}>
+                      <div className={clsx("w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300", autoClear ? "translate-x-0" : "-translate-x-4")} dir="ltr"></div>
+                   </div>
+                   <div className="flex-1">
+                      <p className="font-bold text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <Eraser size={16} className={autoClear ? "text-red-500" : "text-slate-400"}/>
+                        وضع المسح الآمن
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 leading-tight">
+                        إزالة الملفات تلقائياً من التطبيق بعد التشفير وتذكيرك بحذفها من الجهاز.
+                      </p>
+                   </div>
+                </div>
+
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-3 px-1">
                   تنبيه: لن تتمكن من استرجاع الملفات إذا نسيت كلمة المرور.
                 </p>
             </div>
@@ -367,6 +432,21 @@ function App() {
                 </div>
 
                 <div className="p-6 space-y-4">
+                  {/* Delete Reminder Alert */}
+                  {showDeleteReminder && (
+                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 animate-pulse">
+                        <div className="flex items-start gap-3">
+                           <AlertTriangle className="text-red-500 shrink-0 mt-1" size={20}/>
+                           <div>
+                              <p className="font-bold text-red-800 dark:text-red-300 text-sm mb-1">تذكير أمني هام</p>
+                              <p className="text-red-600 dark:text-red-400 text-sm leading-relaxed">
+                                 تم مسح الملفات الأصلية من ذاكرة التطبيق. يرجى الذهاب الآن إلى مدير الملفات أو الاستوديو وحذف الملفات الأصلية يدوياً لضمان الخصوصية التامة.
+                              </p>
+                           </div>
+                        </div>
+                     </div>
+                  )}
+
                   {resizeInfo && (
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4">
                       <div className="flex items-start gap-3 mb-3">
@@ -404,6 +484,7 @@ function App() {
                           setResizeInfo(null);
                           setSecretFiles([]);
                           setCoverImage(null);
+                          setShowDeleteReminder(false);
                         }} 
                         variant="secondary" 
                         className="gap-2 w-full md:w-auto"
@@ -475,21 +556,44 @@ function App() {
                         الملفات المستخرجة ({extractedFileList.length})
                     </h3>
                     <div className="grid gap-3">
-                        {extractedFileList.map((filename, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-primary-200 dark:hover:border-primary-800 transition-colors w-full max-w-full overflow-hidden">
-                                <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
-                                    <FileText className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                    <p className="font-medium text-slate-700 dark:text-slate-300 truncate w-full" dir="auto" title={filename}>{filename}</p>
+                        {extractedFileList.map((filename, idx) => {
+                            const status = fileDownloadStatus[filename] || 'idle';
+                            return (
+                                <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-primary-200 dark:hover:border-primary-800 transition-colors w-full max-w-full overflow-hidden">
+                                    <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
+                                        <FileText className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                        <p className="font-medium text-slate-700 dark:text-slate-300 truncate w-full" dir="auto" title={filename}>{filename}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => downloadExtractedFile(filename)}
+                                        disabled={status === 'loading'}
+                                        className={clsx(
+                                            "flex items-center gap-2 text-sm font-bold px-3 py-1.5 rounded-lg transition-all shrink-0 mr-3 rtl:mr-3 rtl:ml-0 hover:shadow-sm min-w-[100px] justify-center",
+                                            status === 'success' 
+                                              ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 cursor-default" 
+                                              : "text-primary-600 dark:text-primary-400 hover:bg-white dark:hover:bg-slate-700"
+                                        )}
+                                    >
+                                        {status === 'loading' ? (
+                                           <>
+                                             <Loader2 size={16} className="animate-spin" />
+                                             <span>جاري...</span>
+                                           </>
+                                        ) : status === 'success' ? (
+                                           <>
+                                             <Check size={16} />
+                                             <span>تم التحميل</span>
+                                           </>
+                                        ) : (
+                                           <>
+                                             <Download size={16} />
+                                             <span>تحميل</span>
+                                           </>
+                                        )}
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => downloadExtractedFile(filename)}
-                                    className="flex items-center gap-2 text-sm font-bold text-primary-600 dark:text-primary-400 hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm px-3 py-1.5 rounded-lg transition-all shrink-0 mr-3 rtl:mr-3 rtl:ml-0"
-                                >
-                                    <Download size={16} />
-                                    تحميل
-                                </button>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
