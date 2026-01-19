@@ -73,7 +73,7 @@
 
     <script>
       // Register Service Worker
-      if ('serviceWorker' in navigator && !window.location.host.includes('localhost')) {
+      if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js')
             .then(reg => console.log('SW registered'))

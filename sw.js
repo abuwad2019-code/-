@@ -1,18 +1,20 @@
-const CACHE_NAME = 'tashfir-v3-fix';
-const OFFLINE_PAGE = 'index.html';
+const CACHE_NAME = 'tashfir-v4-stable';
+const MAIN_PAGE = './index.html';
 
+// Normalize paths to ensure cache keys match exactly what we request
 const ASSETS_TO_CACHE = [
   './',
-  'index.html',
-  'manifest.json'
+  './index.html',
+  './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // Force activation
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Ensure index.html is definitely cached
-      return cache.addAll(ASSETS_TO_CACHE).catch(err => console.error(err));
+      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
+        console.error('SW Pre-cache failed:', err);
+      });
     })
   );
 });
@@ -20,7 +22,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
-      self.clients.claim(), // Take control immediately
+      self.clients.claim(),
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
@@ -35,39 +37,48 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Only handle http/https requests
   if (!event.request.url.startsWith('http')) return;
 
-  // Strategy for HTML (Navigation): Network First, but fallback to Cache on ANY error (Offline or 404)
+  // 1. Navigation Strategy (Opening the app) -> Network First, Strong Fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // If server returns 404 or error, fall back to cache immediately
-          // This intercepts the "Code: NOT_FOUND" page from the server
-          if (!response || response.status === 404 || response.status >= 500) {
-             return caches.match(OFFLINE_PAGE);
+      (async () => {
+        try {
+          // Try network first
+          const networkResponse = await fetch(event.request);
+          
+          // If server returns 404 (NOT_FOUND) or 500, throw to trigger catch
+          if (!networkResponse || !networkResponse.ok) {
+            throw new Error('Network error or 404');
           }
+
+          // Save valid response
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(event.request, networkResponse.clone());
+          return networkResponse;
+        } catch (error) {
+          // Fallback to cache
+          const cache = await caches.open(CACHE_NAME);
           
-          // If response is good, clone it to cache for next time
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          // Try to find the exact page
+          const cachedResponse = await cache.match(event.request);
+          if (cachedResponse) return cachedResponse;
+
+          // If not found, serve the main index.html (SPA logic)
+          // We check specifically for the key we stored './index.html'
+          const mainPage = await cache.match(MAIN_PAGE);
+          if (mainPage) return mainPage;
           
-          return response;
-        })
-        .catch(() => {
-          // Totally offline? Return cached index.html
-          return caches.match(OFFLINE_PAGE).then(cachedRes => {
-             // Absolute fallback if index.html is somehow missing from specific match
-             return cachedRes || caches.match('./index.html');
-          });
-        })
+          // Last resort: check for root '/'
+          return cache.match('./');
+        }
+      })()
     );
     return;
   }
 
-  // Strategy for Assets: Stale-While-Revalidate
+  // 2. Assets Strategy -> Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
@@ -78,7 +89,9 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      }).catch(() => {});
+      }).catch(() => {
+        // Ignore network errors for assets if offline
+      });
 
       return cachedResponse || fetchPromise;
     })
