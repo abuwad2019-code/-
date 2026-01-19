@@ -1,11 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Unlock, ShieldCheck, Download, AlertCircle, Image as ImageIcon, FileText, Wand2, Key, Eye, EyeOff, Smartphone, Trash2, Facebook, MessageCircle, Moon, Sun, Clock, Eraser, AlertTriangle, Loader2, Check } from 'lucide-react';
+import { Lock, Unlock, ShieldCheck, Download, AlertCircle, Image as ImageIcon, FileText, Wand2, Key, Eye, EyeOff, Smartphone, Trash2, Facebook, MessageCircle, Moon, Sun, Eraser, AlertTriangle, Loader2, Check, Info } from 'lucide-react';
 import { clsx } from 'clsx';
 import JSZip from 'jszip';
 import { FileUploader } from './components/FileUploader';
 import { Button } from './components/Button';
 import { hideFiles, extractFiles } from './utils/steganography';
 import { AppMode } from './types';
+
+// Security Ticker Component - Seamless Infinite Loop
+const SecurityTicker = () => {
+  const tips = [
+    { icon: AlertTriangle, text: "تنبيه أمني: تجنب استخدام صور غلاف ذات أحجام ضخمة جداً (أكبر من 4K) لتفادي إثارة الشكوك." },
+    { icon: Key, text: "نصيحة ذهبية: استخدم كلمة مرور قوية ومعقدة (أحرف، أرقام، ورموز) لضمان استحالة كسر التشفير." },
+    { icon: Trash2, text: "هام جداً: الوكيل الذكي لا يحذف ملفاتك الأصلية تلقائياً. تأكد من حذفها يدوياً من الاستوديو بعد التشفير." },
+    { icon: ShieldCheck, text: "خصوصية تامة: هذا التطبيق يعمل 100% على جهازك ولا يحتاج للإنترنت، ملفاتك لا تغادر هاتفك أبداً." },
+    { icon: AlertCircle, text: "تحذير: احتفظ بكلمة المرور في مكان آمن، ففي حال نسيانها يستحيل استرجاع الملفات المخفية." }
+  ];
+
+  const TickerContent = () => (
+    <div className="flex gap-16 px-4 shrink-0 items-center" dir="rtl">
+       {tips.map((tip, idx) => (
+         <div key={idx} className="flex items-center gap-2 text-xs md:text-sm font-bold text-amber-800 dark:text-amber-500 whitespace-nowrap">
+            <tip.icon size={15} className="shrink-0 mb-0.5" />
+            <span>{tip.text}</span>
+         </div>
+       ))}
+    </div>
+  );
+
+  return (
+    <div className="bg-amber-50 dark:bg-amber-900/10 border-b border-amber-100 dark:border-amber-900/20 overflow-hidden relative h-10 flex items-center shadow-inner select-none group" role="marquee" dir="ltr">
+      <div className="flex w-max animate-marquee-infinite group-hover:pause">
+          <TickerContent />
+          <TickerContent />
+      </div>
+      
+      <style>{`
+        @keyframes marquee-infinite {
+          0% { transform: translateX(-50%); }
+          100% { transform: translateX(0); }
+        }
+        .animate-marquee-infinite {
+          animation: marquee-infinite 80s linear infinite;
+        }
+        .group:hover .animate-marquee-infinite {
+          animation-play-state: paused;
+        }
+      `}</style>
+    </div>
+  );
+};
 
 function App() {
   // Theme State with Time Awareness
@@ -85,16 +129,23 @@ function App() {
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
-      // Only set prompt if not already installed (extra safety)
       if (!isInstalled) {
         setDeferredPrompt(e);
       }
     };
 
+    const handleAppInstalled = () => {
+      console.log('App installed');
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, [isInstalled]);
 
@@ -289,6 +340,9 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* Security Ticker */}
+      <SecurityTicker />
 
       <main className="max-w-4xl mx-auto px-4 mt-8 flex-grow w-full">
         
