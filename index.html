@@ -4,15 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#0ea5e9" />
-    <meta name="description" content="وكيل ذكي لتشفير وإخفاء الملفات داخل الصور باستخدام تقنية إخفاء المعلومات (Steganography) لحماية خصوصيتك." />
+    <meta name="description" content="Tashfir - وكيل ذكي لتشفير وإخفاء الملفات داخل الصور باستخدام تقنية إخفاء المعلومات لحماية خصوصيتك." />
     
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="StegoGuard - المخبأ الرقمي" />
+    <meta property="og:title" content="Tashfir - تشفير" />
     <meta property="og:description" content="قم بإخفاء ملفاتك السرية داخل الصور وتشفيرها بكلمة مرور." />
     <meta property="og:image" content="https://images.unsplash.com/photo-1555617981-7783b03f3319?q=80&w=1200&auto=format&fit=crop" />
 
-    <title>StegoGuard - المخبأ الرقمي</title>
+    <title>Tashfir - تشفير</title>
     
     <!-- Favicon (Inline SVG) -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230ea5e9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E" />
@@ -25,6 +25,7 @@
     
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
@@ -46,20 +47,20 @@
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "vite": "https://esm.sh/vite@^7.3.1",
-    "jszip": "https://esm.sh/jszip@^3.10.1",
-    "clsx": "https://esm.sh/clsx@^2.1.1"
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "clsx": "https://esm.sh/clsx@^2.1.1",
+    "jszip": "https://esm.sh/jszip@^3.10.1"
   }
 }
 </script>
 </head>
-  <body class="bg-slate-50 text-slate-900 font-sans min-h-screen selection:bg-primary-100 selection:text-primary-700">
-    <div id="root"></div>
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans min-h-screen selection:bg-primary-100 selection:text-primary-700 flex flex-col transition-colors duration-300">
+    <div id="root" class="flex-grow"></div>
     
     <!-- Vite Entry Point -->
     <script type="module" src="/index.tsx"></script>

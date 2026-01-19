@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stego-guard-v3';
+const CACHE_NAME = 'tashfir-v1';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

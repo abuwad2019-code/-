@@ -1,5 +1,5 @@
 {
-  "name": "StegoGuard Arabic",
-  "description": "وكيل ذكي لتشفير وإخفاء الملفات داخل الصور باستخدام تقنية إخفاء المعلومات (Steganography).",
+  "name": "Tashfir",
+  "description": "وكيل ذكي لتشفير وإخفاء الملفات داخل الصور باستخدام تقنية إخفاء المعلومات.",
   "requestFramePermissions": []
 }
