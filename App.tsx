@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, Unlock, ShieldCheck, Download, AlertCircle, Image as ImageIcon, FileText, Wand2, Key, Eye, EyeOff, Smartphone, Trash2, Facebook, MessageCircle, Moon, Sun, Eraser, AlertTriangle, Loader2, Check, Info } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import { clsx } from 'clsx';
 import JSZip from 'jszip';
 import { FileUploader } from './components/FileUploader';
@@ -395,7 +396,7 @@ function App() {
                 </h2>
                 <div className="mb-3 text-sm text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-3 rounded-lg flex gap-2">
                   <Wand2 size={16} className="text-primary-500 shrink-0 mt-0.5" />
-                  <p>سيقوم الوكيل الذكي بتعديل حجم الصورة تلقائياً إذا كانت الملفات كبيرة جداً.</p>
+                  <p>سيقوم الوكيل الذكي بتعديل حجم الصورة تلقائياً ��ذا كانت الملفات كبيرة جداً.</p>
                 </div>
                 <FileUploader
                   label="اختر الصورة"
@@ -689,6 +690,9 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
