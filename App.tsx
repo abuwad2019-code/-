@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Unlock, ShieldCheck, Download, AlertCircle, Image as ImageIcon, FileText, Wand2, Key, Eye, EyeOff, Smartphone, Trash2, Facebook, MessageCircle, Moon, Sun, Eraser, AlertTriangle, Loader2, Check, Info } from 'lucide-react';
+import { Lock, Unlock, ShieldCheck, Download, AlertCircle, Image as ImageIcon, FileText, Wand2, Key, Eye, EyeOff, Smartphone, Trash2, Facebook, MessageCircle, Moon, Sun, Eraser, AlertTriangle, Loader2, Check, Info, Share2, Paperclip, File, PenLine } from 'lucide-react';
 import { clsx } from 'clsx';
 import JSZip from 'jszip';
 import { FileUploader } from './components/FileUploader';
@@ -78,6 +78,9 @@ function App() {
   const [autoClear, setAutoClear] = useState(false);
   const [showDeleteReminder, setShowDeleteReminder] = useState(false);
   
+  // Output Filename State
+  const [outputFilename, setOutputFilename] = useState('');
+
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -173,6 +176,7 @@ function App() {
     setResizeInfo(null);
     setShowDeleteReminder(false);
     setFileDownloadStatus({});
+    setOutputFilename('');
   };
 
   // Cleanup Blob URLs
@@ -207,6 +211,9 @@ function App() {
       const url = URL.createObjectURL(blob);
       setResultImage(url);
       
+      // Set default filename
+      setOutputFilename(`Tashfir_Send_As_File_${Date.now()}`);
+
       if (isResized) {
         setResizeInfo({ original: originalDimensions, new: newDimensions });
       }
@@ -263,7 +270,13 @@ function App() {
     if (!resultImage) return;
     const a = document.createElement('a');
     a.href = resultImage;
-    a.download = `tashfir_image_${Date.now()}.png`;
+    
+    // Logic to ensure correct extension
+    let finalName = outputFilename.trim();
+    if (!finalName) finalName = `Tashfir_Send_As_File_${Date.now()}`;
+    if (!finalName.toLowerCase().endsWith('.png')) finalName += '.png';
+    
+    a.download = finalName;
     a.click();
   };
 
@@ -486,6 +499,47 @@ function App() {
                 </div>
 
                 <div className="p-6 space-y-4">
+                  
+                  {/* IMPORTANT: VISUAL GUIDE FOR SHARING */}
+                  <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+                      <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                        <Share2 size={18} className="text-primary-500" />
+                        كيف ترسلها بأمان دون تلف البيانات؟
+                      </h4>
+                      
+                      <div className="flex items-center justify-around gap-2 text-sm">
+                          {/* Wrong Way */}
+                          <div className="flex flex-col items-center opacity-60 grayscale transition-all hover:grayscale-0 hover:opacity-100">
+                             <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2 relative">
+                                <ImageIcon size={24} className="text-red-500" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                   <div className="w-full h-0.5 bg-red-500 rotate-45 transform scale-110"></div>
+                                </div>
+                             </div>
+                             <span className="text-slate-500 dark:text-slate-400 font-medium">كمعرض صور</span>
+                             <span className="text-[10px] text-red-500 font-bold mt-1">يتلف البيانات ❌</span>
+                          </div>
+
+                          {/* Arrow */}
+                          <div className="text-slate-300 dark:text-slate-600">
+                             <span className="text-2xl">→</span>
+                          </div>
+
+                          {/* Correct Way */}
+                          <div className="flex flex-col items-center">
+                             <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-2 ring-2 ring-green-500 ring-offset-2 dark:ring-offset-slate-800 shadow-lg shadow-green-500/20 animate-pulse">
+                                <FileText size={28} className="text-green-600 dark:text-green-400" />
+                             </div>
+                             <span className="text-green-700 dark:text-green-400 font-bold">كمستند / ملف</span>
+                             <span className="text-[10px] text-green-600 dark:text-green-500 font-bold mt-1">يحفظ البيانات ✅</span>
+                          </div>
+                      </div>
+
+                      <div className="mt-4 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 leading-relaxed text-center">
+                         عند الإرسال في <b>واتساب</b>، اضغط أيقونة المشبك <Paperclip size={10} className="inline mx-1"/> ثم اختر <b>"مستند"</b> <File size={10} className="inline mx-1"/> وليس الكاميرا.
+                      </div>
+                  </div>
+
                   {/* Delete Reminder Alert */}
                   {showDeleteReminder && (
                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 animate-pulse">
@@ -526,11 +580,28 @@ function App() {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Filename Editor */}
+                  <div className="flex flex-col gap-1">
+                      <label className="text-xs font-bold text-slate-500 dark:text-slate-400 mr-1">اسم الصورة عند الحفظ:</label>
+                      <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-primary-500/50 transition-all">
+                        <PenLine size={16} className="text-slate-400 shrink-0" />
+                        <input 
+                          type="text" 
+                          value={outputFilename} 
+                          onChange={(e) => setOutputFilename(e.target.value)}
+                          className="bg-transparent border-none outline-none text-slate-700 dark:text-slate-200 text-sm font-medium w-full placeholder:text-slate-400"
+                          placeholder="اسم الملف..."
+                          dir="ltr"
+                        />
+                        <span className="text-slate-400 text-sm font-mono shrink-0">.png</span>
+                      </div>
+                  </div>
 
                   <div className="flex justify-center pt-2 gap-3 flex-wrap">
                       <Button onClick={downloadEncryptedImage} variant="primary" className="gap-2 w-full md:w-auto">
                           <Download size={20} />
-                          تحميل الصورة النهائية
+                          تحميل الصورة
                       </Button>
                       <Button 
                         onClick={() => {
@@ -539,6 +610,7 @@ function App() {
                           setSecretFiles([]);
                           setCoverImage(null);
                           setShowDeleteReminder(false);
+                          setOutputFilename('');
                         }} 
                         variant="secondary" 
                         className="gap-2 w-full md:w-auto"
